@@ -23,6 +23,9 @@
     <None Include="..\TiposBarraPeru\config.json" Link="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Include="..\TiposBarraPeru\materiales.json" Link="materiales.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -49,6 +49,12 @@ namespace TiposBarraPeru.Pruebas
             Seccion("9. Otros diametros: area, peso y rango de norma", PruebasOtrosDiametros);
             Seccion("10. Otros diametros: parametros E.060 frente a los del catalogo", PruebasParametrosOtros);
             Seccion("11. Otros diametros: catalogoExtra, planificador y validacion", PruebasCatalogoExtra);
+            Seccion("12. Concreto: unidades, catalogo y nombres", PruebasConcretoCatalogo);
+            Seccion("13. Concreto: modulo de elasticidad y de corte (E.060 8.5)", PruebasConcretoModulos);
+            Seccion("14. Concreto: ligero, termico, color y descripcion", PruebasConcretoLigero);
+            Seccion("15. Concreto: rango de f'c y densidad", PruebasConcretoRango);
+            Seccion("16. Concreto: planificador, extras y validacion", PruebasConcretoPlanificador);
+            Seccion("17. Concreto: lectura de materiales.json", PruebasConcretoConfig);
 
             Console.WriteLine();
             Console.WriteLine(_ok + " comprobaciones superadas, " + _fallos + " fallidas.");
@@ -473,6 +479,374 @@ namespace TiposBarraPeru.Pruebas
             Comprobar("rechaza: nombre no admitido por Revit", (Planificador.ValidarNuevaBarra(cfg3, O, "a|b", 10.5, proyecto, valido) ?? "").StartsWith("Revit no admite"));
             Comprobar("el mismo diametro con otro nombre es valido (14mm y #4.4)", Planificador.ValidarNuevaBarra(cfg3, O, "otro10", 10, proyecto, valido) == null);
             Comprobar("sin existentes ni validador", Planificador.ValidarNuevaBarra(cfg3, O, "20mm", 20, null) == null);
+        }
+
+        // ------------------------------------------------------------------
+        // Materiales de concreto
+        // ------------------------------------------------------------------
+        private const string P = "Concreto f'c ";
+        private static readonly double[] Fcs = { 140, 175, 210, 245, 280, 315, 350, 420 };
+
+        private static void PruebasConcretoCatalogo()
+        {
+            // unidades: 1 kg/cm2 = 0.0980665 MPa
+            Igual("210 kg/cm2 -> 20.594 MPa", 20.594, Unidades.KgCm2AMPa(210), 1e-3);
+            Igual("280 kg/cm2 -> 27.459 MPa", 27.459, Unidades.KgCm2AMPa(280), 1e-3);
+            Igual("21316.78 MPa -> 217370.65 kg/cm2", 217370.65, Unidades.MPaAKgCm2(21316.78), 0.1);
+            Igual("ida y vuelta kg/cm2 -> MPa -> kg/cm2", 350, Unidades.MPaAKgCm2(Unidades.KgCm2AMPa(350)), 1e-9);
+            Igual("ida y vuelta MPa -> kg/cm2 -> MPa", 25, Unidades.KgCm2AMPa(Unidades.MPaAKgCm2(25)), 1e-9);
+
+            ConfiguracionMateriales cfg = ConfiguracionMateriales.PorDefecto();
+            Comprobar("8 resistencias", cfg.Catalogo.Count == 8, cfg.Catalogo.Count.ToString());
+            for (int i = 0; i < Fcs.Length && i < cfg.Catalogo.Count; i++)
+            {
+                Igual("f'c " + F(Fcs[i]), Fcs[i], cfg.Catalogo[i].FcKgCm2);
+                Igual("densidad normal " + F(Fcs[i]), 2400, cfg.Catalogo[i].DensidadKgM3);
+            }
+            Igual("prefijo por defecto", P, cfg.PrefijoNombre);
+            Comprobar("actualizar existentes desactivado", !cfg.ActualizarExistentes);
+            Comprobar("duplicar apariencia activado", cfg.DuplicarApariencia);
+            Igual("clase de material", "Concreto", cfg.ClaseMaterial);
+            Igual("palabras clave", "concreto, hormigón, Perú", cfg.PalabrasClave);
+            Igual("material de apariencia por defecto", "Concrete, Cast-in-Place gray", cfg.MaterialApariencia[0]);
+            Comprobar("tramas con alternativas en espanol e ingles", cfg.TramaCorte.Contains("Concrete") && cfg.TramaCorte.Contains("Hormigón") && cfg.TramaSuperficie.Count == 3);
+            Comprobar("sin extras por defecto", cfg.CatalogoExtra.Count == 0);
+            Igual("Poisson 0.15", 0.15, cfg.Reglas.Poisson);
+            Igual("dilatacion 1e-5", 1e-5, cfg.Reglas.DilatacionTermicaPorC, 1e-12);
+
+            // nombres: prefijo + f'c
+            string[] esperados = { P + "140", P + "175", P + "210", P + "245", P + "280", P + "315", P + "350", P + "420" };
+            for (int i = 0; i < esperados.Length; i++)
+                Igual("nombre " + esperados[i], esperados[i], Nombres.GenerarConcreto(cfg.PrefijoNombre, cfg.Catalogo[i].FcKgCm2));
+            Igual("nombre de catalogo 210", "210", Nombres.NombreCatalogoConcreto(210));
+            Igual("nombre de catalogo 212.5 (punto decimal)", "212.5", Nombres.NombreCatalogoConcreto(212.5));
+            Igual("nombre de catalogo 210.004 se redondea", "210", Nombres.NombreCatalogoConcreto(210.004));
+            Igual("prefijo vacio", "280", Nombres.GenerarConcreto("", 280));
+            Igual("prefijo nulo", "280", Nombres.GenerarConcreto(null, 280));
+            Igual("prefijo personalizado", "C-280", Nombres.GenerarConcreto("C-", 280));
+            Comprobar("NombreCatalogo de la entrada", cfg.Catalogo[2].NombreCatalogo == "210");
+            Comprobar("comparacion sin mayusculas", Nombres.Iguales("concreto F'C 210", P + "210"));
+        }
+
+        private static void PruebasConcretoModulos()
+        {
+            ConfiguracionMateriales cfg = ConfiguracionMateriales.PorDefecto();
+            var r = new ReglasConcreto(cfg.Reglas, cfg.Termico);
+
+            // E = 15000 raiz(f'c) para 210: 217 371 kg/cm2 = 21 317 MPa
+            Igual("E 210 kg/cm2", 217370.65, r.ModuloNormalKgCm2(210), 0.01);
+            Igual("E 210 MPa", 21316.78, r.ModuloElasticidadMPa(210, 2400), 0.01);
+            Igual("E 210 kg/cm2 con densidad normal", 217370.65, r.ModuloElasticidadKgCm2(210, 2400), 0.01);
+            double[] eKg = { 177482.39, 198431.35, 217370.65, 234787.14, 250998.01, 266223.59, 280624.30, 307408.52 };
+            double[] eMPa = { 17405.08, 19459.47, 21316.78, 23024.75, 24614.50, 26107.62, 27519.84, 30146.48 };
+            for (int i = 0; i < Fcs.Length; i++)
+            {
+                ValoresConcreto v = r.Calcular(Fcs[i], 2400);
+                Igual("E " + F(Fcs[i]) + " kg/cm2", eKg[i], v.EKgCm2, 0.01);
+                Igual("E " + F(Fcs[i]) + " MPa", eMPa[i], v.EMPa, 0.01);
+                Comprobar("E " + F(Fcs[i]) + " crece con f'c", i == 0 || v.EKgCm2 > eKg[i - 1]);
+                Comprobar("formula normal " + F(Fcs[i]), v.DensidadNormal && v.FormulaE.Contains("15000"));
+            }
+            Igual("E 100", 150000, r.ModuloNormalKgCm2(100), 1e-6);
+            Igual("E 1000", 474341.65, r.ModuloNormalKgCm2(1000), 0.01);
+            Igual("15000 raiz(f'c) equivale a ~4700 raiz(f'c MPa)", 4697.3, r.ModuloElasticidadMPa(210, 2400) / Math.Sqrt(Unidades.KgCm2AMPa(210)), 0.1);
+
+            // G = E / (2 (1 + nu)), nu = 0.15
+            Igual("G 210 kg/cm2", 94508.98, ReglasConcreto.ModuloCorte(217370.65, 0.15), 0.01);
+            ValoresConcreto v210 = r.Calcular(210, 2400);
+            Igual("G 210 en Calcular", 94508.98, v210.GKgCm2, 0.01);
+            Igual("G 210 MPa", 9268.17, v210.GMPa, 0.01);
+            Igual("Poisson en Calcular", 0.15, v210.Poisson);
+            Igual("G con nu = 0.20 (ACI)", 217370.65 / 2.4, ReglasConcreto.ModuloCorte(217370.65, 0.20), 1e-6);
+            cfg.Reglas.Poisson = 0.20;
+            Igual("G con Poisson editado en config", 217370.65 / 2.4, new ReglasConcreto(cfg.Reglas, cfg.Termico).Calcular(210, 2400).GKgCm2, 0.01);
+            cfg.Reglas.Poisson = 0.15;
+
+            // formula general E = wc^1.5 * 0.043 * raiz(f'c MPa)
+            Igual("general 210 @ 2300 -> 21524 MPa", 21524.36, r.ModuloGeneralMPa(210, 2300), 0.01);
+            Igual("general 210 @ 1800 -> 14902 MPa", 14902.09, r.ModuloGeneralMPa(210, 1800), 0.01);
+            Igual("general 210 @ 1800 en kg/cm2", 151959.03, Unidades.MPaAKgCm2(r.ModuloGeneralMPa(210, 1800)), 0.01);
+            double normal = r.ModuloElasticidadMPa(210, 2400);
+            double general2300 = r.ModuloGeneralMPa(210, 2300);
+            Comprobar("general @ 2300 esta un 1 % por encima de la normal", general2300 > normal && general2300 / normal < 1.015, F(general2300 / normal));
+            Comprobar("general @ 1800 esta por debajo de la normal", r.ModuloGeneralMPa(210, 1800) < normal);
+
+            // Calcular elige la formula por la densidad
+            ValoresConcreto v2300 = r.Calcular(210, 2300);
+            Comprobar("2300 no es la densidad normal (2400)", !v2300.DensidadNormal && !r.EsDensidadNormal(2300));
+            Igual("2300 usa la formula general", general2300, v2300.EMPa, 1e-9);
+            Comprobar("texto de la formula general", v2300.FormulaE.Contains("wc^1.5") && v2300.FormulaE.Contains("2300"), v2300.FormulaE);
+            ValoresConcreto v1800 = r.Calcular(210, 1800);
+            Igual("1800 usa la formula general", 14902.09, v1800.EMPa, 0.01);
+            Igual("G con 1800", 14902.09 / 2.3, v1800.GMPa, 0.01);
+            Comprobar("2400 usa la formula normal aunque la general daria 22943", v210.DensidadNormal && Math.Abs(v210.EMPa - 21316.78) < 0.01 && Math.Abs(r.ModuloGeneralMPa(210, 2400) - 22943.27) < 0.01);
+
+            // densidad normal editable en config: con 2300 como normal, 2300 usa la simplificada
+            cfg.Reglas.DensidadNormalKgM3 = 2300;
+            var r2 = new ReglasConcreto(cfg.Reglas, cfg.Termico);
+            Comprobar("densidad normal 2300 en config", r2.EsDensidadNormal(2300) && !r2.EsDensidadNormal(2400));
+            Igual("con normal = 2300, 2300 usa 15000 raiz(f'c)", 21316.78, r2.ModuloElasticidadMPa(210, 2300), 0.01);
+            Igual("con normal = 2300, 2400 usa la general", 22943.27, r2.ModuloElasticidadMPa(210, 2400), 0.01);
+
+            Igual("f'c 0 -> E 0", 0, r.ModuloNormalKgCm2(0));
+            Igual("f'c negativo -> E 0", 0, r.ModuloGeneralMPa(-5, 2300));
+        }
+
+        private static void PruebasConcretoLigero()
+        {
+            ConfiguracionMateriales cfg = ConfiguracionMateriales.PorDefecto();
+            var r = new ReglasConcreto(cfg.Reglas, cfg.Termico);
+
+            Comprobar("1800 es ligero", r.EsLigero(1800));
+            Comprobar("1899 es ligero", r.EsLigero(1899));
+            Comprobar("1900 no es ligero (limite)", !r.EsLigero(1900));
+            Comprobar("2400 no es ligero", !r.EsLigero(2400));
+            Igual("factor de corte normal 1.0", 1.0, r.FactorCorte(2400));
+            Igual("factor de corte ligero 0.75", 0.75, r.FactorCorte(1800));
+            ValoresConcreto vl = r.Calcular(210, 1800), vn = r.Calcular(210, 2400);
+            Comprobar("Calcular: ligero", vl.Ligero && !vn.Ligero);
+            Igual("Calcular: factor ligero", 0.75, vl.FactorCorte);
+            Igual("Calcular: factor normal", 1.0, vn.FactorCorte);
+
+            // tabla termica: dos juegos, la conductividad cambia y el resto es igual
+            Igual("conductividad normal 1.046", 1.046, vn.Termico.ConductividadWmK);
+            Igual("conductividad ligero 0.5", 0.5, vl.Termico.ConductividadWmK);
+            Igual("calor especifico 0.657", 0.657, vn.Termico.CalorEspecificoJgC);
+            Igual("calor especifico ligero igual", 0.657, vl.Termico.CalorEspecificoJgC);
+            Igual("emisividad 0.95", 0.95, vn.Termico.Emisividad);
+            Igual("permeabilidad 182.4", 182.4, vn.Termico.PermeabilidadNgPaSm2);
+            Igual("porosidad 0.01", 0.01, vn.Termico.Porosidad);
+            Igual("reflectividad 0", 0, vn.Termico.Reflectividad);
+            Igual("resistividad 2e9", 2.0e9, vn.Termico.ResistividadOhmM);
+            Comprobar("no transmite luz", !vn.Termico.TransmiteLuz && !vl.Termico.TransmiteLuz);
+            Comprobar("la densidad del activo termico es la de la fila", vl.DensidadKgM3 == 1800 && vn.DensidadKgM3 == 2400);
+            Comprobar("umbral ligero editable", !new ReglasConcreto(new ReglasConcretoCfg { DensidadLigeroKgM3 = 1700 }, cfg.Termico).EsLigero(1800));
+            cfg.Termico.Ligero.ConductividadWmK = 0.6;
+            Igual("conductividad ligero editada en config", 0.6, new ReglasConcreto(cfg.Reglas, cfg.Termico).Calcular(210, 1800).Termico.ConductividadWmK);
+
+            // gris: mas oscuro cuanto mayor f'c
+            Comprobar("gris 100 -> 210", ReglasConcreto.Gris(100) == 210, ReglasConcreto.Gris(100).ToString());
+            Comprobar("gris 140 -> 207", ReglasConcreto.Gris(140) == 207, ReglasConcreto.Gris(140).ToString());
+            Comprobar("gris 210 -> 201", ReglasConcreto.Gris(210) == 201, ReglasConcreto.Gris(210).ToString());
+            Comprobar("gris 420 -> 184", ReglasConcreto.Gris(420) == 184, ReglasConcreto.Gris(420).ToString());
+            Comprobar("gris 1000 -> 138", ReglasConcreto.Gris(1000) == 138, ReglasConcreto.Gris(1000).ToString());
+            Comprobar("gris acotado por debajo", ReglasConcreto.Gris(5000) == 110 && ReglasConcreto.Gris(-100) == 220);
+            for (int i = 1; i < Fcs.Length; i++)
+                Comprobar("gris decrece " + F(Fcs[i]), ReglasConcreto.Gris(Fcs[i]) < ReglasConcreto.Gris(Fcs[i - 1]));
+            Comprobar("gris en Calcular", vn.Gris == 201);
+
+            // descripcion con coma decimal
+            Igual("descripcion 210", "f'c = 210 kg/cm² (20,6 MPa), E.060", ReglasConcreto.Descripcion(210));
+            Igual("descripcion 280", "f'c = 280 kg/cm² (27,5 MPa), E.060", ReglasConcreto.Descripcion(280));
+            Igual("descripcion 212.5", "f'c = 212,5 kg/cm² (20,8 MPa), E.060", ReglasConcreto.Descripcion(212.5));
+            Igual("descripcion en Calcular", ReglasConcreto.Descripcion(210), vn.Descripcion);
+        }
+
+        private static void PruebasConcretoRango()
+        {
+            ConfiguracionMateriales cfg = ConfiguracionMateriales.PorDefecto();
+            var r = new ReglasConcreto(cfg.Reglas, cfg.Termico);
+            Igual("minimo f'c", 100, cfg.Reglas.FcMinimoKgCm2);
+            Igual("maximo f'c", 1000, cfg.Reglas.FcMaximoKgCm2);
+            Comprobar("100 dentro (limite)", r.DentroDeNorma(100, 2400));
+            Comprobar("1000 dentro (limite)", r.DentroDeNorma(1000, 2400));
+            Comprobar("210 dentro", r.DentroDeNorma(210, 2400) && r.MotivoFueraDeNorma(210, 2400) == null);
+            Comprobar("99.99 fuera", !r.DentroDeNorma(99.99, 2400));
+            Comprobar("1000.01 fuera", !r.DentroDeNorma(1000.01, 2400));
+            Comprobar("50 fuera", !r.DentroDeNorma(50, 2400));
+            Comprobar("1200 fuera", !r.DentroDeNorma(1200, 2400));
+            Igual("motivo 50", "f'c menor de 100 kg/cm2, fuera de rango", r.MotivoFueraDeNorma(50, 2400));
+            Igual("motivo 1200", "f'c mayor de 1000 kg/cm2, fuera de rango", r.MotivoFueraDeNorma(1200, 2400));
+            Igual("motivo 0", "f'c no valido", r.MotivoFueraDeNorma(0, 2400));
+            Igual("motivo negativo", "f'c no valido", r.MotivoFueraDeNorma(-210, 2400));
+
+            // densidad: 1450 a 2500 (formula general E.060)
+            Comprobar("1450 dentro (limite)", r.DentroDeNorma(210, 1450));
+            Comprobar("2500 dentro (limite)", r.DentroDeNorma(210, 2500));
+            Comprobar("1449 fuera", !r.DentroDeNorma(210, 1449));
+            Comprobar("2501 fuera", !r.DentroDeNorma(210, 2501));
+            Igual("motivo densidad 1000", "densidad menor de 1450 kg/m3, fuera de la formula E.060", r.MotivoFueraDeNorma(210, 1000));
+            Igual("motivo densidad 3000", "densidad mayor de 2500 kg/m3, fuera de la formula E.060", r.MotivoFueraDeNorma(210, 3000));
+            Igual("motivo densidad 0", "densidad no valida", r.MotivoFueraDeNorma(210, 0));
+            Comprobar("f'c fuera manda sobre densidad fuera", (r.MotivoFueraDeNorma(50, 1000) ?? "").StartsWith("f'c"));
+            Comprobar("Calcular.DentroDeNorma", r.Calcular(210, 2400).DentroDeNorma && !r.Calcular(50, 2400).DentroDeNorma && !r.Calcular(210, 1000).DentroDeNorma);
+            Comprobar("fuera de rango se sigue calculando (para mostrar)", r.Calcular(50, 2400).EKgCm2 > 0);
+
+            // rango editable en config
+            var c2 = ConfiguracionMateriales.Deserializar("{ \"reglas\": { \"fcMinimoKgCm2\": 175, \"fcMaximoKgCm2\": 500 } }");
+            var r2 = new ReglasConcreto(c2.Reglas, c2.Termico);
+            Comprobar("rango de config: 140 fuera, 175 dentro, 500 dentro, 501 fuera",
+                      !r2.DentroDeNorma(140, 2400) && r2.DentroDeNorma(175, 2400) && r2.DentroDeNorma(500, 2400) && !r2.DentroDeNorma(501, 2400));
+            var mal = ConfiguracionMateriales.Deserializar("{ \"reglas\": { \"fcMinimoKgCm2\": 0, \"fcMaximoKgCm2\": -1, \"densidadMinimaKgM3\": 0, \"densidadMaximaKgM3\": 0 } }");
+            Comprobar("rango invalido vuelve al de por defecto", mal.Reglas.FcMinimoKgCm2 == 100 && mal.Reglas.FcMaximoKgCm2 == 1000 &&
+                      mal.Reglas.DensidadMinimaKgM3 == 1450 && mal.Reglas.DensidadMaximaKgM3 == 2500);
+        }
+
+        private static void PruebasConcretoPlanificador()
+        {
+            ConfiguracionMateriales cfg = ConfiguracionMateriales.PorDefecto();
+            var existentes = new List<MaterialExistente>
+            {
+                new MaterialExistente(P + "210", "Concreto"),      // igual
+                new MaterialExistente("concreto F'C 280", "Madera"), // solo cambia la mayuscula, otra clase
+                new MaterialExistente("Concrete, Cast-in-Place gray", "Concrete") // ajeno al catalogo
+            };
+
+            // a) sin actualizar: idempotente
+            List<FilaPlanConcreto> plan = PlanificadorConcreto.Planificar(cfg, P, existentes, false);
+            Comprobar("8 filas", plan.Count == 8);
+            FilaPlanConcreto f210 = plan.First(f => f.Concreto.FcKgCm2 == 210);
+            FilaPlanConcreto f280 = plan.First(f => f.Concreto.FcKgCm2 == 280);
+            FilaPlanConcreto f140 = plan.First(f => f.Concreto.FcKgCm2 == 140);
+            Comprobar("210 ya existe", f210.Estado == EstadoFila.YaExiste && !f210.Crear && f210.Aviso == null);
+            Comprobar("280 ya existe (sin distinguir mayusculas) con aviso de clase", f280.Estado == EstadoFila.YaExiste && f280.Aviso == "clase Madera", f280.Aviso);
+            Igual("texto de estado 280", "ya existe (clase Madera)", f280.TextoEstado);
+            Comprobar("140 se creara", f140.Estado == EstadoFila.SeCreara && f140.Crear && f140.Nombre == P + "140");
+            Comprobar("6 filas a crear", plan.Count(f => f.Crear) == 6);
+            Comprobar("existentes no seleccionables", !f210.Seleccionable && f140.Seleccionable);
+            Comprobar("valores en la fila", Math.Abs(f210.Valores.EKgCm2 - 217370.65) < 0.01 && f210.Valores.Gris == 201);
+            Comprobar("ninguna es extra", plan.All(f => !f.EsExtra));
+
+            // b) actualizar existentes
+            plan = PlanificadorConcreto.Planificar(cfg, P, existentes, true);
+            Comprobar("actualizar: 210 se actualizara", plan.First(f => f.Concreto.FcKgCm2 == 210).Estado == EstadoFila.SeActualizara);
+            Comprobar("actualizar: 8 marcadas", plan.Count(f => f.Crear) == 8);
+            Comprobar("actualizar: aviso de clase se conserva", plan.First(f => f.Concreto.FcKgCm2 == 280).Aviso == "clase Madera");
+
+            // c) otro prefijo: nada existe
+            plan = PlanificadorConcreto.Planificar(cfg, "C-", existentes, false);
+            Comprobar("prefijo C-: todo se creara", plan.All(f => f.Estado == EstadoFila.SeCreara) && plan[0].Nombre == "C-140");
+
+            // d) validador de Revit (simulado: rechaza el apostrofo)
+            plan = PlanificadorConcreto.Planificar(cfg, P, existentes, false, n => !n.Contains("'"));
+            Comprobar("nombres con apostrofo no validos", plan.Count(f => f.Estado == EstadoFila.NombreInvalido) == 8);
+            Comprobar("nombre no valido no se marca", plan.All(f => !f.Crear && !f.Seleccionable));
+            plan = PlanificadorConcreto.Planificar(cfg, "Concreto fc ", existentes, false, n => !n.Contains("'"));
+            Comprobar("con otro prefijo todos validos", plan.All(f => f.Estado != EstadoFila.NombreInvalido));
+
+            // e) sin materiales existentes
+            plan = PlanificadorConcreto.Planificar(cfg, P, null, false);
+            Comprobar("sin existentes: 8 a crear", plan.Count(f => f.Crear) == 8);
+
+            // f) extras: lectura, limpieza y planificacion
+            string json = "{ \"catalogoExtra\": [" +
+                          " { \"fcKgCm2\": 300, \"densidadKgM3\": 1800 }," +
+                          " { \"fcKgCm2\": 210, \"densidadKgM3\": 2400 }," +
+                          " { \"fcKgCm2\": 50 }," +
+                          " { \"fcKgCm2\": 1200 }," +
+                          " { \"fcKgCm2\": 250, \"densidadKgM3\": 1000 }," +
+                          " { \"fcKgCm2\": 300.004, \"densidadKgM3\": 2400 }," +
+                          " { \"fcKgCm2\": 0 }," +
+                          " { \"densidadKgM3\": 2400 } ] }";
+            ConfiguracionMateriales c = ConfiguracionMateriales.Deserializar(json);
+            Comprobar("catalogo original intacto (8)", c.Catalogo.Count == 8);
+            Comprobar("extras: 4 validos (se quitan el 210 repetido, el 300 repetido, el 0 y el sin f'c)", c.CatalogoExtra.Count == 4, c.CatalogoExtra.Count.ToString());
+            Comprobar("extras: 210 no se duplica", !c.CatalogoExtra.Any(x => x.FcKgCm2 == 210));
+            Comprobar("extras: 300.004 (mismo nombre) se descarta", c.CatalogoExtra.Count(x => x.NombreCatalogo == "300") == 1 && c.CatalogoExtra.First(x => x.NombreCatalogo == "300").DensidadKgM3 == 1800);
+            Comprobar("extras sin densidad toman la normal", c.CatalogoExtra.First(x => x.FcKgCm2 == 50).DensidadKgM3 == 2400);
+            Comprobar("ida y vuelta conserva los extras", ConfiguracionMateriales.Deserializar(c.Serializar()).CatalogoExtra.Count == 4);
+
+            plan = PlanificadorConcreto.Planificar(c, P, existentes, false);
+            Comprobar("12 filas", plan.Count == 12, plan.Count.ToString());
+            Comprobar("las 8 primeras no son extra y las 4 ultimas si", plan.Take(8).All(f => !f.EsExtra) && plan.Skip(8).All(f => f.EsExtra));
+            FilaPlanConcreto f300 = plan.First(f => f.Concreto.FcKgCm2 == 300);
+            FilaPlanConcreto f50 = plan.First(f => f.Concreto.FcKgCm2 == 50);
+            FilaPlanConcreto f1200 = plan.First(f => f.Concreto.FcKgCm2 == 1200);
+            FilaPlanConcreto f250 = plan.First(f => f.Concreto.FcKgCm2 == 250);
+            Comprobar("300 @ 1800 se creara, ligero, con la formula general", f300.Estado == EstadoFila.SeCreara && f300.Crear && f300.Nombre == P + "300" && f300.Valores.Ligero && !f300.Valores.DensidadNormal);
+            Igual("300 @ 1800: E MPa", Math.Pow(1800, 1.5) * 0.043 * Math.Sqrt(Unidades.KgCm2AMPa(300)), f300.Valores.EMPa, 1e-6);
+            Comprobar("50 fuera de rango: no se crea", f50.Estado == EstadoFila.FueraDeNorma && !f50.Crear && !f50.Seleccionable);
+            Igual("50 texto de estado", "no se crea (f'c menor de 100 kg/cm2, fuera de rango)", f50.TextoEstado);
+            Igual("1200 texto de estado", "no se crea (f'c mayor de 1000 kg/cm2, fuera de rango)", f1200.TextoEstado);
+            Igual("250 @ 1000 texto de estado", "no se crea (densidad menor de 1450 kg/m3, fuera de la formula E.060)", f250.TextoEstado);
+            Comprobar("fuera de rango tampoco con actualizar", PlanificadorConcreto.Planificar(c, P, existentes, true).Count(f => f.Estado == EstadoFila.FueraDeNorma) == 3);
+            Comprobar("7 filas a crear (8 - 2 existentes + 1 extra valido)", plan.Count(f => f.Crear) == 7, plan.Count(f => f.Crear).ToString());
+
+            // g) nombre repetido en la tabla (dos entradas del catalogo con el mismo nombre)
+            var c2 = ConfiguracionMateriales.Deserializar("{ \"catalogo\": [ { \"fcKgCm2\": 210 }, { \"fcKgCm2\": 210.004 }, { \"fcKgCm2\": 280 } ] }");
+            List<FilaPlanConcreto> plan2 = PlanificadorConcreto.Planificar(c2, P, null, false);
+            Comprobar("dos filas producen " + P + "210: ambas repetidas", plan2.Count(f => f.Estado == EstadoFila.NombreDuplicado) == 2 && plan2.Where(f => f.Estado == EstadoFila.NombreDuplicado).All(f => !f.Crear));
+            Igual("texto repetido", "nombre repetido en la tabla", plan2.First(f => f.Estado == EstadoFila.NombreDuplicado).TextoEstado);
+            Comprobar("la de 280 se crea", plan2.First(f => f.Concreto.FcKgCm2 == 280).Crear);
+
+            // h) validacion de una resistencia nueva antes de anadirla
+            ConfiguracionMateriales c3 = ConfiguracionMateriales.PorDefecto();
+            c3.CatalogoExtra.Add(new ConcretoCatalogo(300, 1800));
+            var proyecto = new List<MaterialExistente> { new MaterialExistente(P + "500", "Concreto"), new MaterialExistente("Acero", "Metal") };
+            Func<string, bool> valido = n => !n.Contains("|");
+            Comprobar("valida: 250 @ 2400", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 250, 2400, proyecto, valido) == null);
+            Comprobar("valida: 350.5 @ 1600", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 350.5, 1600, proyecto, valido) == null);
+            Comprobar("valida: limites 100 @ 1450 y 1000 @ 2500", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 100, 1450, proyecto, valido) == null && PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 1000, 2500, proyecto, valido) == null);
+            Igual("rechaza: 50", "f'c menor de 100 kg/cm2, fuera de rango", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 50, 2400, proyecto, valido));
+            Igual("rechaza: 1200", "f'c mayor de 1000 kg/cm2, fuera de rango", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 1200, 2400, proyecto, valido));
+            Igual("rechaza: densidad 1000", "densidad menor de 1450 kg/m3, fuera de la formula E.060", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 250, 1000, proyecto, valido));
+            Igual("rechaza: repetido en catalogo", "f'c 210 ya esta en el catalogo", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 210, 2400, proyecto, valido));
+            Igual("rechaza: repetido en catalogo con otra densidad", "f'c 210 ya esta en el catalogo", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 210, 1800, proyecto, valido));
+            Igual("rechaza: repetido en extras", "f'c 300 ya esta en la lista", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 300, 2400, proyecto, valido));
+            Igual("rechaza: choca con material del proyecto", "el proyecto ya tiene un material \"" + P + "500\"", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 500, 2400, proyecto, valido));
+            Comprobar("con otro prefijo 500 ya no choca", PlanificadorConcreto.ValidarNuevoConcreto(c3, "C-", 500, 2400, proyecto, valido) == null);
+            Comprobar("rechaza: nombre no admitido por Revit", (PlanificadorConcreto.ValidarNuevoConcreto(c3, "a|b ", 250, 2400, proyecto, valido) ?? "").StartsWith("Revit no admite"));
+            Comprobar("sin existentes ni validador", PlanificadorConcreto.ValidarNuevoConcreto(c3, P, 250, 2400, null) == null);
+        }
+
+        private static void PruebasConcretoConfig()
+        {
+            // a) el materiales.json distribuido equivale a la configuracion por defecto
+            string ruta = Path.Combine(AppContext.BaseDirectory, "materiales.json");
+            Comprobar("materiales.json copiado junto a las pruebas", File.Exists(ruta), ruta);
+            ConfiguracionMateriales leida = ConfiguracionMateriales.Cargar(ruta);
+            Comprobar("materiales.json: 8 resistencias", leida.Catalogo.Count == 8);
+            Igual("materiales.json equivale al por defecto", ConfiguracionMateriales.PorDefecto().Serializar(), leida.Serializar());
+
+            // b) comentarios, comas finales, camelCase y valores parciales
+            string json = "{\n  // comentario\n  \"prefijoNombre\": \"C-\",\n  \"actualizarExistentes\": true,\n  \"duplicarApariencia\": false,\n" +
+                          "  \"tramaCorte\": [ \"Hormigón\", ],\n" +
+                          "  \"catalogo\": [ { \"fcKgCm2\": 175, }, { \"fcKgCm2\": 210, \"densidadKgM3\": 2300 }, ],\n" +
+                          "  \"reglas\": { \"poisson\": 0.2, \"densidadLigeroKgM3\": 1850, },\n" +
+                          "  \"termico\": { \"ligero\": { \"conductividadWmK\": 0.6, }, },\n}\n";
+            ConfiguracionMateriales c = ConfiguracionMateriales.Deserializar(json);
+            Igual("prefijo leido", "C-", c.PrefijoNombre);
+            Comprobar("actualizarExistentes leido", c.ActualizarExistentes);
+            Comprobar("duplicarApariencia leido", !c.DuplicarApariencia);
+            Comprobar("tramaCorte de 1 entrada, tramaSuperficie por defecto", c.TramaCorte.Count == 1 && c.TramaSuperficie.Count == 3);
+            Comprobar("catalogo de 2 entradas", c.Catalogo.Count == 2);
+            Comprobar("densidad omitida toma la normal", c.Catalogo[0].DensidadKgM3 == 2400 && c.Catalogo[1].DensidadKgM3 == 2300);
+            Igual("poisson leido", 0.2, c.Reglas.Poisson);
+            Igual("umbral ligero leido", 1850, c.Reglas.DensidadLigeroKgM3);
+            Igual("dilatacion no indicada: por defecto", 1e-5, c.Reglas.DilatacionTermicaPorC, 1e-12);
+            Igual("termico ligero conductividad leida", 0.6, c.Termico.Ligero.ConductividadWmK);
+            Igual("termico ligero: el resto por defecto", 0.657, c.Termico.Ligero.CalorEspecificoJgC);
+            Igual("termico normal no indicado: por defecto", 1.046, c.Termico.Normal.ConductividadWmK);
+
+            // c) valores sin sentido vuelven al por defecto
+            var mal = ConfiguracionMateriales.Deserializar("{ \"reglas\": { \"poisson\": 0.9, \"dilatacionTermicaPorC\": -1, \"factorCorteLigero\": 0 }," +
+                                                           " \"termico\": { \"normal\": { \"conductividadWmK\": -1, \"emisividad\": 2 }, \"ligero\": null }," +
+                                                           " \"materialApariencia\": [], \"prefijoNombre\": null }");
+            Comprobar("poisson 0.9 -> 0.15", mal.Reglas.Poisson == 0.15);
+            Comprobar("dilatacion negativa -> 1e-5", Math.Abs(mal.Reglas.DilatacionTermicaPorC - 1e-5) < 1e-12);
+            Comprobar("factor de corte 0 -> 0.75", mal.Reglas.FactorCorteLigero == 0.75);
+            Comprobar("conductividad negativa -> 1.046", mal.Termico.Normal.ConductividadWmK == 1.046);
+            Comprobar("emisividad 2 -> 0.95", mal.Termico.Normal.Emisividad == 0.95);
+            Comprobar("termico ligero nulo -> por defecto", mal.Termico.Ligero != null && mal.Termico.Ligero.ConductividadWmK == 0.5);
+            Comprobar("lista de apariencia vacia -> por defecto", mal.MaterialApariencia.Count == 6);
+            Igual("prefijo nulo -> vacio", "", mal.PrefijoNombre);
+
+            // d) archivo inexistente, JSON vacio y JSON invalido
+            Comprobar("sin archivo: por defecto", ConfiguracionMateriales.Cargar(Path.Combine(AppContext.BaseDirectory, "no_existe.json")).Catalogo.Count == 8);
+            ConfiguracionMateriales vacio = ConfiguracionMateriales.Deserializar("{}");
+            Comprobar("JSON vacio: catalogo por defecto", vacio.Catalogo.Count == 8);
+            Igual("JSON vacio: prefijo por defecto", P, vacio.PrefijoNombre);
+            bool lanza = false;
+            try { ConfiguracionMateriales.Deserializar("{ esto no es json"); } catch { lanza = true; }
+            Comprobar("JSON invalido lanza excepcion", lanza);
+
+            // e) ida y vuelta con extras y clon
+            leida.CatalogoExtra.Add(new ConcretoCatalogo(300, 1800));
+            ConfiguracionMateriales clon = leida.Clonar();
+            Igual("clon identico", leida.Serializar(), clon.Serializar());
+            Comprobar("clon conserva el extra", clon.CatalogoExtra.Count == 1 && clon.CatalogoExtra[0].DensidadKgM3 == 1800);
+            Comprobar("serializado legible (acentos sin escapar)", leida.Serializar().Contains("\"palabrasClave\": \"concreto, hormigón, Perú\""));
+            Comprobar("nombreCatalogo no se serializa", !leida.Serializar().Contains("nombreCatalogo"));
         }
     }
 }
