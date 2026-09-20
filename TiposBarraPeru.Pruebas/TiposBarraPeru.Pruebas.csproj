@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Programa de comprobacion sin Revit: consola net10.0 que referencia la DLL de
+    reglas y verifica nombres, diametros de doblado, ganchos, lectura del config y
+    planificacion. Se ejecuta con: dotnet run (proyecto TiposBarraPeru.Pruebas, configuracion Release)
+  -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <RootNamespace>TiposBarraPeru.Pruebas</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TiposBarraPeru.Reglas\TiposBarraPeru.Reglas.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- El config.json real del add-in, para comprobar que se lee tal cual se distribuye -->
+    <None Include="..\TiposBarraPeru\config.json" Link="config.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+</Project>

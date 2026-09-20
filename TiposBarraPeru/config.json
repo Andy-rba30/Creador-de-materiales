@@ -1,0 +1,62 @@
+{
+  // Prefijo por defecto del nombre de los tipos (editable en la ventana).
+  // nombre del tipo = prefijo + nombre del catalogo  ->  Ø6mm, Ø3/8", Ø1 3/8" ...
+  "prefijoNombre": "Ø",
+  // Simbolo con el que se escribe la pulgada en el nombre. "\"" conserva la comilla del catalogo.
+  "simboloPulgada": "\"",
+  // Valor inicial de la casilla "actualizar los que ya existen" (false = solo se crean los que faltan).
+  "actualizarExistentes": false,
+  // false = longitudes de gancho calculadas por Revit; true = fijadas segun E.060 por cada tipo de gancho.
+  "longitudesGanchoSegunE060": false,
+  // Radio maximo de doblado del tipo (mm).
+  "radioMaximoDobladoMm": 10000,
+  // Tolerancia para avisar de que un tipo existente tiene otro diametro (mm).
+  "toleranciaDiametroMm": 0.05,
+
+  // Catalogo peruano, ASTM A615 Grado 60. "corrugada": false crea el tipo como barra lisa (Plain).
+  "catalogo": [
+    { "nombre": "6mm",    "diametroMm": 6.0,  "areaCm2": 0.28,  "pesoKgM": 0.222, "corrugada": true },
+    { "nombre": "8mm",    "diametroMm": 8.0,  "areaCm2": 0.50,  "pesoKgM": 0.395, "corrugada": true },
+    { "nombre": "3/8\"",  "diametroMm": 9.5,  "areaCm2": 0.71,  "pesoKgM": 0.560, "corrugada": true },
+    { "nombre": "12mm",   "diametroMm": 12.0, "areaCm2": 1.13,  "pesoKgM": 0.888, "corrugada": true },
+    { "nombre": "1/2\"",  "diametroMm": 12.7, "areaCm2": 1.29,  "pesoKgM": 0.994, "corrugada": true },
+    { "nombre": "5/8\"",  "diametroMm": 15.9, "areaCm2": 2.00,  "pesoKgM": 1.552, "corrugada": true },
+    { "nombre": "3/4\"",  "diametroMm": 19.1, "areaCm2": 2.84,  "pesoKgM": 2.235, "corrugada": true },
+    { "nombre": "1\"",    "diametroMm": 25.4, "areaCm2": 5.10,  "pesoKgM": 3.973, "corrugada": true },
+    { "nombre": "1 3/8\"", "diametroMm": 35.8, "areaCm2": 10.06, "pesoKgM": 7.907, "corrugada": true }
+  ],
+
+  // Diametros anadidos desde la ventana ("Otro diametro"). El add-in los guarda aqui; se pueden editar a mano.
+  // Ejemplo: { "nombre": "10mm", "diametroMm": 10.0, "areaCm2": 0.79, "pesoKgM": 0.617, "corrugada": true }
+  "catalogoExtra": [],
+
+  // Norma E.060 (Concreto Armado), articulos 7.1 y 7.2. Los tramos son "hasta este diametro (mm), este
+  // multiplicador de db"; se evaluan en orden y el ultimo cubre todo lo que quede por encima.
+  "reglasE060": {
+    // Rango de diametros que cubre la norma (mm). Fuera de el la fila avisa y no se crea el tipo.
+    "diametroMinimoNormaMm": 6,
+    "diametroMaximoNormaMm": 57,
+    // 7.2.1, tabla 7.2: diametro interior minimo de doblado de barras principales y de sus ganchos.
+    "dobladoBarras": [
+      { "hastaDiametroMm": 25.4, "multiplicador": 6 },
+      { "hastaDiametroMm": 35.8, "multiplicador": 8 },
+      { "hastaDiametroMm": 999,  "multiplicador": 10 }
+    ],
+    // 7.2.2: diametro interior minimo de doblado de estribos.
+    "dobladoEstribos": [
+      { "hastaDiametroMm": 15.9, "multiplicador": 4 },
+      { "hastaDiametroMm": 999,  "multiplicador": 6 }
+    ],
+    // 7.1: extension recta tras el doblez. "minimoMm" es un minimo absoluto (0 = sin minimo).
+    "ganchos": {
+      "estandar180": { "multiplicador": 4, "minimoMm": 65 },
+      "estandar90":  { "multiplicador": 12, "minimoMm": 0 },
+      "estribo90": [
+        { "hastaDiametroMm": 15.9, "multiplicador": 6 },
+        { "hastaDiametroMm": 999,  "multiplicador": 12 }
+      ],
+      // Con "minimoMm": 75 se convierte en el gancho sismico del art. 21.1.
+      "estribo135":  { "multiplicador": 6, "minimoMm": 0 }
+    }
+  }
+}

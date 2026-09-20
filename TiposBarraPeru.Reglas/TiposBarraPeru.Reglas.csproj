@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Reglas puras del add-in: catalogo, configuracion, nombres, reglas E.060 y
+    planificacion. No depende de Revit ni de WPF, por eso es net10.0 a secas y
+    se puede probar desde una consola en cualquier sistema.
+  -->
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <AssemblyName>TiposBarraPeru.Reglas</AssemblyName>
+    <RootNamespace>TiposBarraPeru.Reglas</RootNamespace>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+  </PropertyGroup>
+
+</Project>

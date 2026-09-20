@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RevitAddIns>
+  <!-- Aplicacion: anade la pestana "Peru" con el boton "Tipos de barra Peru" -->
+  <AddIn Type="Application">
+    <Name>Tipos de barra Peru</Name>
+    <Assembly>TiposBarraPeru\TiposBarraPeru.dll</Assembly>
+    <FullClassName>TiposBarraPeru.Aplicacion</FullClassName>
+    <ClientId>c4d0a2e7-6f3b-4a8e-9d21-7b5e0f1a3c92</ClientId>
+    <VendorId>LOCAL</VendorId>
+    <VendorDescription>Uso interno</VendorDescription>
+  </AddIn>
+  <!-- Comando: el mismo comando en Complementos > Herramientas externas, por si no se quiere la cinta -->
+  <AddIn Type="Command">
+    <Name>Tipos de barra Peru</Name>
+    <Text>Tipos de barra Peru</Text>
+    <Description>Crea en el proyecto los tipos de barra de armadura (RebarBarType) del catalogo peruano con los diametros de doblado y ganchos de la norma E.060.</Description>
+    <Assembly>TiposBarraPeru\TiposBarraPeru.dll</Assembly>
+    <FullClassName>TiposBarraPeru.ComandoTiposBarra</FullClassName>
+    <ClientId>a9e17c3d-52b8-4f6a-8e04-3d6c9b2f7e15</ClientId>
+    <VendorId>LOCAL</VendorId>
+    <VendorDescription>Uso interno</VendorDescription>
+    <VisibilityMode>NotVisibleInFamily</VisibilityMode>
+  </AddIn>
+</RevitAddIns>
