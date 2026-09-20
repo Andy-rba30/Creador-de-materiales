@@ -1,8 +1,14 @@
-# Tipos de barra Perú — add-in Revit 2027
+# Tipos de barra y materiales de concreto Perú — add-in Revit 2027
 
-Crea en el proyecto abierto los **tipos de barra de armadura** (`RebarBarType`) con los
-diámetros del catálogo peruano (ASTM A615 Grado 60) y los **diámetros de doblado y
-ganchos de la norma E.060** (Concreto Armado, artículos 7.1 y 7.2, que sigue ACI 318).
+Dos botones en la pestaña **Perú**, panel **Armadura**:
+
+- **Tipos de barra Perú**: crea en el proyecto abierto los **tipos de barra de armadura**
+  (`RebarBarType`) con los diámetros del catálogo peruano (ASTM A615 Grado 60) y los
+  **diámetros de doblado y ganchos de la norma E.060** (Concreto Armado, artículos 7.1 y
+  7.2, que sigue ACI 318).
+- **Materiales de concreto**: crea los **materiales de concreto** (`Material`) por
+  resistencia f'c con identidad, gráficos, apariencia y activos físico y térmico
+  calculados según E.060 art. 8.5. Ver [Materiales de concreto](#materiales-de-concreto).
 
 Al lanzarlo lee los tipos que ya existen y abre una ventana con el catálogo: una fila
 por tamaño con casilla "crear", nombre resultante, diámetro, área, peso, diámetros de
@@ -185,6 +191,142 @@ Los valores quedan entre los de `Ø3/8"` (9.5 mm) y `Ø12mm`, que tienen los mis
 multiplicadores. La consola de pruebas comprueba esto para 10 mm, 1 1/4" (31.8 mm,
 8 db de doblado como `Ø1 3/8"`), #6 (19.05 mm, como `Ø3/4"`), y rechaza 5 mm y 60 mm.
 
+## Materiales de concreto
+
+El segundo botón, **Materiales de concreto**, funciona igual que el de tipos de barra:
+lee los materiales del proyecto y abre una ventana con el catálogo de resistencias, una
+fila por f'c con casilla "crear", nombre resultante, f'c en kg/cm² y MPa, E, densidad y
+estado ("ya existe" / "se creará"). Por defecto solo se crean los que faltan; con
+"actualizar los que ya existen" se reescriben los que ya tienen ese nombre. Su
+configuración está en `materiales.json`, junto a la DLL, separada de `config.json`.
+
+### Catálogo y nombre
+
+```
+nombre del material = prefijo + f'c        (prefijo por defecto "Concreto f'c ")
+```
+
+| Nombre | f'c (kg/cm²) | f'c (MPa) | E (kg/cm²) | E (MPa) | Gris |
+|---|---|---|---|---|---|
+| `Concreto f'c 140` | 140 | 13,7 | 177 482 | 17 405 | 207 |
+| `Concreto f'c 175` | 175 | 17,2 | 198 431 | 19 459 | 204 |
+| `Concreto f'c 210` | 210 | 20,6 | 217 371 | 21 317 | 201 |
+| `Concreto f'c 245` | 245 | 24,0 | 234 787 | 23 025 | 198 |
+| `Concreto f'c 280` | 280 | 27,5 | 250 998 | 24 615 | 196 |
+| `Concreto f'c 315` | 315 | 30,9 | 266 224 | 26 108 | 193 |
+| `Concreto f'c 350` | 350 | 34,3 | 280 624 | 27 520 | 190 |
+| `Concreto f'c 420` | 420 | 41,2 | 307 409 | 30 146 | 184 |
+
+Todos de peso normal, densidad 2400 kg/m³ (concreto armado). El nombre se valida con
+`NamingUtils.IsValidName` y se compara con los materiales existentes sin distinguir
+mayúsculas; si el existente no es de clase concreto, el estado lo avisa ("ya existe
+(clase Madera)").
+
+### Fórmulas (E.060 art. 8.5, `reglas` de materiales.json)
+
+| Propiedad | Regla | Config |
+|---|---|---|
+| f'c | entrada en kg/cm²; MPa = kg/cm² × 0,0980665 | `fcMinimoKgCm2` = 100, `fcMaximoKgCm2` = 1000 |
+| E, peso normal | E = 15000·√f'c (kg/cm²) ≡ 4700·√f'c (MPa) | `coeficienteENormal`, `densidadNormalKgM3` = 2400 |
+| E, otra densidad wc | E = wc^1,5 · 0,043 · √f'c (MPa), wc entre 1450 y 2500 kg/m³ | `coeficienteEGeneral`, `densidadMinimaKgM3`, `densidadMaximaKgM3` |
+| Poisson ν | 0,15 (ACI usa 0,20) | `poisson` |
+| G | E / (2·(1 + ν)) | |
+| Dilatación térmica | 1,0×10⁻⁵ /°C | `dilatacionTermicaPorC` |
+| Densidad | la de la fila | `densidadKgM3` de cada entrada |
+| Ligero | densidad < 1900 kg/m³: casilla "ligero" del activo | `densidadLigeroKgM3` |
+| Factor de reducción a corte | 1,0 peso normal, 0,75 ligero | `factorCorteNormal`, `factorCorteLigero` |
+
+Se usa la fórmula general **siempre que la densidad no sea la normal** (2400). Con 2300
+kg/m³ la general da 21 524 MPa para f'c = 210, un 1 % más que la simplificada. Ejemplo
+completo para `Concreto f'c 210`:
+
+| | Valor |
+|---|---|
+| f'c | 210 kg/cm² = 20,6 MPa |
+| E | 15000·√210 = 217 371 kg/cm² = 21 317 MPa |
+| G (ν = 0,15) | 217 371 / 2,3 = 94 509 kg/cm² = 9 268 MPa |
+| Descripción | `f'c = 210 kg/cm² (20,6 MPa), E.060` |
+| Color de sombreado | gris 201 (210 − 0,08·(f'c − 100), acotado entre 110 y 220) |
+
+f'c fuera de 100 a 1000 kg/cm², o densidad fuera de 1450 a 2500 kg/m³, marca la fila
+"no se crea" con el motivo y queda sin casilla.
+
+### Propiedades térmicas (`termico`)
+
+No dependen de f'c sino de la densidad: hay un juego **normal** y otro **ligero**,
+editables. Valores por defecto de la biblioteca de Revit para el hormigón en masa:
+
+| Propiedad | Normal | Ligero | `UnitTypeId` |
+|---|---|---|---|
+| Conductividad térmica | 1,046 W/(m·K) | 0,5 W/(m·K) | `WattsPerMeterKelvin` |
+| Calor específico | 0,657 J/(g·°C) | igual | `JoulesPerGramDegreeCelsius` |
+| Densidad | la de la fila | la de la fila | `KilogramsPerCubicMeter` |
+| Emisividad | 0,95 | igual | adimensional |
+| Permeabilidad | 182,4 ng/(Pa·s·m²) | igual | `NanogramsPerPascalSecondSquareMeter` |
+| Porosidad | 0,01 | igual | adimensional |
+| Reflectividad | 0 | igual | adimensional |
+| Resistividad eléctrica | 2,0×10⁹ Ω·m | igual | `OhmMeters` |
+| Transmite luz | no | no | |
+| Comportamiento | isótropo | isótropo | |
+
+### Qué escribe en cada material
+
+| Propiedad | Valor |
+|---|---|
+| `Material.Create(doc, nombre)` | prefijo + f'c |
+| `MaterialClass` | `claseMaterial` ("Concreto") |
+| Descripción / Palabras clave | parámetros `PROPERTY_SET_DESCRIPTION` (o `ALL_MODEL_DESCRIPTION`) y `PROPERTY_SET_KEYWORDS`, localizados por `Material.GetIdentityParameterIds` o por nombre visible |
+| `Color`, `UseRenderAppearanceForShading = false` | gris según f'c |
+| `CutForegroundPatternId`, `SurfaceForegroundPatternId` | trama buscada por nombre (`tramaCorte`, `tramaSuperficie`, primero de dibujo y luego de modelo); si no hay, sin trama y aviso |
+| `AppearanceAssetId` | la API no crea apariencias desde cero: se copia la del material de referencia (`materialApariencia`, con alternativas; si no, el primer material de clase concreto con apariencia). Con `duplicarApariencia: true` cada material recibe su copia con `AppearanceAssetElement.Duplicate`; sin referencia, se crea sin apariencia y se avisa |
+| Activo físico | `StructuralAsset(nombre, StructuralAssetClass.Concrete)`: `Behavior` isótropo, `Density`, `SetYoungModulus`, `SetPoissonRatio`, `SetShearModulus`, `SetThermalExpansionCoefficient`, `ConcreteCompression`, `ConcreteShearStrengthReduction`, `Lightweight`; `PropertySetElement.Create` y `SetMaterialAspectByPropertySet(MaterialAspect.Structural, id)` |
+| Activo térmico | `ThermalAsset(nombre + " (termico)", ThermalMaterialType.Solid)` con la tabla de arriba; `PropertySetElement.Create` y `MaterialAspect.Thermal` |
+
+Las tensiones se convierten con `UnitTypeId.Megapascals` (la API 2027 no tiene
+kgf/cm²), la densidad con `KilogramsPerCubicMeter` y la dilatación con
+`InverseDegreesCelsius`. Los nombres de `PropertySetElement` son únicos en el proyecto:
+si ya existe uno con ese nombre (material que se actualiza o activo de una ejecución
+anterior) se le reescribe el activo con `SetStructuralAsset` / `SetThermalAsset`.
+
+Cada material se crea en su propia `SubTransaction` dentro de una única `Transaction`;
+el resumen final muestra creados, actualizados, omitidos, errores y avisos.
+
+### Otra resistencia
+
+El grupo **"Otra resistencia"** admite cualquier f'c entre 100 y 1000 kg/cm² con su
+densidad (2400 por defecto); E se calcula en vivo al escribir. **"Añadir a la lista"**
+valida (rango, nombre admitido por Revit, sin repetir el catálogo, otro extra ni un
+material del proyecto) y guarda la fila en `catalogoExtra` de `materiales.json`; el botón
+**"Quitar"** de la fila la borra. El catálogo original no se toca.
+
+Ejemplo, f'c = 300 con densidad 1800 kg/m³: ligero, factor de corte 0,75, juego térmico
+"ligero", E = 1800^1,5 · 0,043 · √29,4 = 14 902 MPa (151 959 kg/cm²).
+
+### materiales.json
+
+```jsonc
+{
+  "prefijoNombre": "Concreto f'c ",
+  "actualizarExistentes": false,
+  "claseMaterial": "Concreto",
+  "palabrasClave": "concreto, hormigón, Perú",
+  "duplicarApariencia": true,
+  "materialApariencia": [ "Concrete, Cast-in-Place gray", "Hormigón moldeado in situ, gris", "Concreto", "Concrete" ],
+  "tramaCorte": [ "Concreto", "Hormigón", "Concrete" ],
+  "tramaSuperficie": [ "Concreto", "Hormigón", "Concrete" ],
+  "catalogo": [ { "fcKgCm2": 140, "densidadKgM3": 2400 }, /* ... */ { "fcKgCm2": 420, "densidadKgM3": 2400 } ],
+  "catalogoExtra": [],                    // lo que se añade desde la ventana
+  "reglas": { "poisson": 0.15, "dilatacionTermicaPorC": 1.0E-05, "densidadNormalKgM3": 2400, "densidadLigeroKgM3": 1900,
+              "densidadMinimaKgM3": 1450, "densidadMaximaKgM3": 2500, "fcMinimoKgCm2": 100, "fcMaximoKgCm2": 1000,
+              "factorCorteNormal": 1.0, "factorCorteLigero": 0.75, "coeficienteENormal": 15000, "coeficienteEGeneral": 0.043 },
+  "termico": { "normal": { "conductividadWmK": 1.046, /* ... */ }, "ligero": { "conductividadWmK": 0.5, /* ... */ } }
+}
+```
+
+Mismo formato que `config.json` (camelCase, comentarios y comas finales, valores por
+defecto si falta algo o no tiene sentido). "Guardar opciones", "Añadir a la lista" y
+"Quitar" reescriben el archivo y pierden los comentarios.
+
 ## Instalación
 
 Carpeta de add-ins de Revit 2027: `%AppData%\Autodesk\Revit\Addins\2027\`
@@ -195,15 +337,16 @@ Carpeta de add-ins de Revit 2027: `%AppData%\Autodesk\Revit\Addins\2027\`
 └── TiposBarraPeru\
     ├── TiposBarraPeru.dll
     ├── TiposBarraPeru.Reglas.dll
-    └── config.json
+    ├── config.json
+    └── materiales.json
 ```
 
 1. Compila (ver abajo) o copia los archivos de `TiposBarraPeru\bin\Release\net10.0-windows\`.
-2. Copia `TiposBarraPeru.addin` a la carpeta de add-ins y las dos DLL más `config.json` a la
-   subcarpeta `TiposBarraPeru`.
-3. Arranca Revit 2027. Aparece la pestaña **Perú**, panel **Armadura**, botón
-   **Tipos de barra Perú**. El mismo comando está también en
-   Complementos ▸ Herramientas externas.
+2. Copia `TiposBarraPeru.addin` a la carpeta de add-ins y las dos DLL más `config.json` y
+   `materiales.json` a la subcarpeta `TiposBarraPeru`.
+3. Arranca Revit 2027. Aparece la pestaña **Perú**, panel **Armadura**, botones
+   **Tipos de barra Perú** y **Materiales de concreto**. Los dos comandos están también
+   en Complementos ▸ Herramientas externas.
 
 Compilando en **Debug** en Windows, el proyecto copia solo estos archivos a la carpeta de
 add-ins (target `CopyToRevit` del csproj).
@@ -225,8 +368,8 @@ Proyectos de la solución:
 
 | Proyecto | Marco | Contenido |
 |---|---|---|
-| `TiposBarraPeru.Reglas` | net10.0 | Catálogo, config.json, nombres, reglas E.060, planificador. Sin Revit ni WPF. |
-| `TiposBarraPeru` | net10.0-windows | Add-in: cinta, comando, ventana WPF construida en código, creación de tipos. |
+| `TiposBarraPeru.Reglas` | net10.0 | Catálogos, config.json y materiales.json, nombres, reglas E.060 de barras y de concreto, planificadores. Sin Revit ni WPF. |
+| `TiposBarraPeru` | net10.0-windows | Add-in: cinta con dos botones, comandos, ventanas WPF construidas en código, creación de tipos y de materiales. |
 | `TiposBarraPeru.Pruebas` | net10.0 (consola) | Comprobaciones de las reglas puras, ejecutables sin Revit. |
 
 ## Cómo editar el catálogo
@@ -282,7 +425,17 @@ actualización, tipos con otro diámetro, nombres no válidos) y los otros diám
 (fórmulas de área y peso contrastadas con el catálogo, rango de la norma, parámetros
 E.060 de 10 mm, 1 1/4" y #6 frente a los tamaños del catálogo que los rodean, rechazo de
 5 mm y 60 mm, lectura y limpieza de `catalogoExtra`, nombres repetidos y validación de
-una barra nueva). Resultado actual: **295 comprobaciones superadas, 0 fallidas**.
+una barra nueva).
+
+Para los materiales de concreto (secciones 12 a 17): conversión kg/cm² ↔ MPa ida y
+vuelta, catálogo y nombres con prefijo, E = 15000·√f'c para 210 (217 371 kg/cm², 21 317
+MPa) y para todo el catálogo, G con ν = 0,15 y 0,20, fórmula general con 1800 y 2300
+kg/m³ frente a la simplificada, elección de fórmula por densidad, ligero por densidad y
+factor de corte, juegos térmicos, gris y descripción, rango 100 a 1000 kg/cm² y 1450 a
+2500 kg/m³ en los límites, planificador (idempotencia, actualización, clase distinta,
+extras, fuera de rango, nombres repetidos, validación de una resistencia nueva) y lectura
+de `materiales.json` (distribuido, con comentarios, valores sin sentido, vacío, inválido,
+ida y vuelta). Resultado actual: **548 comprobaciones superadas, 0 fallidas**.
 
 ## Limitaciones y lo no probado
 
@@ -294,6 +447,15 @@ una barra nueva). Resultado actual: **295 comprobaciones superadas, 0 fallidas**
   `simboloPulgada`), el icono de la cinta y la ventana WPF, incluido el grupo "Otro
   diámetro" y el botón "Quitar" (su lógica de validación y planificación sí está cubierta
   por la consola).
+- **Materiales de concreto, tampoco ejecutado en Revit.** Queda por comprobar: la creación
+  de materiales y de los `PropertySetElement` físico y térmico con sus validaciones de
+  rango, que Revit admita el apóstrofo de `f'c` en nombres de material y de activo (si
+  no, cambiar el prefijo), qué parámetro integrado lleva la descripción y las palabras
+  clave del material (el código prueba `PROPERTY_SET_*` y `ALL_MODEL_DESCRIPTION` y avisa
+  si ninguno es editable), los nombres en español de las tramas y del material de
+  apariencia de las plantillas (editables en `materiales.json`), la duplicación de la
+  apariencia, el segundo botón con su icono y la ventana. Fórmulas, unidades, nombres,
+  rango y planificación sí están cubiertos por la consola.
 - El área (cm²) solo se muestra en la ventana; no se escribe en el tipo. El peso sí,
   mediante la propiedad nativa `BarMassPerUnitLength` de Revit 2027. Si hiciera falta el
   área en tablas de planificación, el siguiente paso sería un parámetro compartido de

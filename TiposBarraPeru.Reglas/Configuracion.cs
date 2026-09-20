@@ -1,9 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Encodings.Web;
 using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace TiposBarraPeru.Reglas
 {
@@ -136,21 +134,6 @@ namespace TiposBarraPeru.Reglas
             return c;
         }
 
-        private static JsonSerializerOptions OpcionesLectura() => new JsonSerializerOptions
-        {
-            PropertyNameCaseInsensitive = true,
-            ReadCommentHandling = JsonCommentHandling.Skip,
-            AllowTrailingCommas = true
-        };
-
-        private static JsonSerializerOptions OpcionesEscritura() => new JsonSerializerOptions
-        {
-            WriteIndented = true,
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            // el prefijo "Ø" y las comillas de pulgada quedan legibles en el archivo
-            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
-        };
-
         /// <summary>Lee la configuracion de un archivo; si no existe devuelve la de por defecto.</summary>
         public static Configuracion Cargar(string ruta)
         {
@@ -161,12 +144,12 @@ namespace TiposBarraPeru.Reglas
         /// <summary>Lee la configuracion de un texto JSON. Lanza excepcion si el JSON no es valido.</summary>
         public static Configuracion Deserializar(string json)
         {
-            Configuracion c = JsonSerializer.Deserialize<Configuracion>(json, OpcionesLectura()) ?? new Configuracion();
+            Configuracion c = JsonSerializer.Deserialize<Configuracion>(json, Json.Lectura()) ?? new Configuracion();
             c.Normalizar();
             return c;
         }
 
-        public string Serializar() => JsonSerializer.Serialize(this, OpcionesEscritura());
+        public string Serializar() => JsonSerializer.Serialize(this, Json.Escritura());
 
         public void Guardar(string ruta) => File.WriteAllText(ruta, Serializar());
 

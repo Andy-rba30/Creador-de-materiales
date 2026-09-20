@@ -1,0 +1,88 @@
+{
+  // Prefijo del nombre del material (editable en la ventana). nombre = prefijo + f'c -> "Concreto f'c 210".
+  "prefijoNombre": "Concreto f'c ",
+  // Valor inicial de la casilla "actualizar los que ya existen" (false = solo se crean los que faltan).
+  "actualizarExistentes": false,
+  // Identidad del material.
+  "claseMaterial": "Concreto",
+  "palabrasClave": "concreto, hormigón, Perú",
+  // true = cada material recibe una copia de la apariencia de referencia (AppearanceAssetElement.Duplicate);
+  // false = todos comparten el activo de apariencia del material de referencia.
+  "duplicarApariencia": true,
+  // Materiales del proyecto de los que copiar la apariencia, por orden de preferencia. Si ninguno existe se
+  // usa el primer material de clase concreto con apariencia; si tampoco, se crea sin apariencia y se avisa.
+  "materialApariencia": [
+    "Concrete, Cast-in-Place gray",
+    "Hormigón moldeado in situ, gris",
+    "Hormigón in situ gris",
+    "Concreto",
+    "Hormigón",
+    "Concrete"
+  ],
+  // Tramas de corte y de superficie, buscadas por nombre (primero de dibujo, luego de modelo). Si no se
+  // encuentra ninguna, el material se crea sin trama y se avisa.
+  "tramaCorte": [ "Concreto", "Hormigón", "Concrete" ],
+  "tramaSuperficie": [ "Concreto", "Hormigón", "Concrete" ],
+
+  // Resistencias usuales en Peru (kg/cm2), todas de peso normal (2400 kg/m3, concreto armado).
+  "catalogo": [
+    { "fcKgCm2": 140, "densidadKgM3": 2400 },
+    { "fcKgCm2": 175, "densidadKgM3": 2400 },
+    { "fcKgCm2": 210, "densidadKgM3": 2400 },
+    { "fcKgCm2": 245, "densidadKgM3": 2400 },
+    { "fcKgCm2": 280, "densidadKgM3": 2400 },
+    { "fcKgCm2": 315, "densidadKgM3": 2400 },
+    { "fcKgCm2": 350, "densidadKgM3": 2400 },
+    { "fcKgCm2": 420, "densidadKgM3": 2400 }
+  ],
+
+  // Resistencias anadidas desde la ventana ("Otra resistencia"). El add-in las guarda aqui; se pueden editar a mano.
+  // Ejemplo: { "fcKgCm2": 300, "densidadKgM3": 1800 }
+  "catalogoExtra": [],
+
+  // Norma E.060 art. 8.5 y valores editables.
+  "reglas": {
+    "poisson": 0.15,
+    "dilatacionTermicaPorC": 1.0E-05,
+    // Con esta densidad E = coeficienteENormal * raiz(f'c) en kg/cm2; con cualquier otra, la formula general.
+    "densidadNormalKgM3": 2400,
+    // Por debajo de esta densidad el concreto es ligero (casilla "ligero", factor de corte reducido, juego termico "ligero").
+    "densidadLigeroKgM3": 1900,
+    // Rango de densidad en que vale la formula general (E.060 8.5.1). Fuera, la fila avisa y no se crea.
+    "densidadMinimaKgM3": 1450,
+    "densidadMaximaKgM3": 2500,
+    // Rango admitido de f'c (kg/cm2). Fuera, la fila avisa y no se crea.
+    "fcMinimoKgCm2": 100,
+    "fcMaximoKgCm2": 1000,
+    "factorCorteNormal": 1.0,
+    "factorCorteLigero": 0.75,
+    // E = 15000 raiz(f'c) kg/cm2 (peso normal) y E = wc^1.5 * 0.043 raiz(f'c) MPa (general).
+    "coeficienteENormal": 15000,
+    "coeficienteEGeneral": 0.043
+  },
+
+  // Activo termico (solido). No depende de f'c: juego "normal" y juego "ligero", segun la densidad.
+  // Valores de la biblioteca de Revit para el hormigon en masa; la densidad es la de la fila.
+  "termico": {
+    "normal": {
+      "conductividadWmK": 1.046,
+      "calorEspecificoJgC": 0.657,
+      "emisividad": 0.95,
+      "permeabilidadNgPaSm2": 182.4,
+      "porosidad": 0.01,
+      "reflectividad": 0,
+      "resistividadOhmM": 2.0E+09,
+      "transmiteLuz": false
+    },
+    "ligero": {
+      "conductividadWmK": 0.5,
+      "calorEspecificoJgC": 0.657,
+      "emisividad": 0.95,
+      "permeabilidadNgPaSm2": 182.4,
+      "porosidad": 0.01,
+      "reflectividad": 0,
+      "resistividadOhmM": 2.0E+09,
+      "transmiteLuz": false
+    }
+  }
+}

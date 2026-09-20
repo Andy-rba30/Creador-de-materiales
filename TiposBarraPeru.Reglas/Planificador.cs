@@ -48,23 +48,7 @@ namespace TiposBarraPeru.Reglas
         public ValoresE060 Valores;
 
         /// <summary>Texto de la columna "estado".</summary>
-        public string TextoEstado
-        {
-            get
-            {
-                string t;
-                switch (Estado)
-                {
-                    case EstadoFila.SeCreara: t = "se creara"; break;
-                    case EstadoFila.YaExiste: t = "ya existe"; break;
-                    case EstadoFila.SeActualizara: t = "se actualizara"; break;
-                    case EstadoFila.FueraDeNorma: t = "no se crea"; break;
-                    case EstadoFila.NombreDuplicado: t = "nombre repetido en la tabla"; break;
-                    default: t = "nombre no valido"; break;
-                }
-                return string.IsNullOrEmpty(Aviso) ? t : t + " (" + Aviso + ")";
-            }
-        }
+        public string TextoEstado => Planificador.TextoEstado(Estado, Aviso);
 
         /// <summary>true si la casilla "crear" puede marcarse con el estado actual.</summary>
         public bool Seleccionable => Estado == EstadoFila.SeCreara || Estado == EstadoFila.SeActualizara;
@@ -78,6 +62,22 @@ namespace TiposBarraPeru.Reglas
     /// </summary>
     public static class Planificador
     {
+        /// <summary>Texto de la columna "estado" de una fila (barras y concreto), con su aviso entre parentesis.</summary>
+        public static string TextoEstado(EstadoFila estado, string aviso)
+        {
+            string t;
+            switch (estado)
+            {
+                case EstadoFila.SeCreara: t = "se creara"; break;
+                case EstadoFila.YaExiste: t = "ya existe"; break;
+                case EstadoFila.SeActualizara: t = "se actualizara"; break;
+                case EstadoFila.FueraDeNorma: t = "no se crea"; break;
+                case EstadoFila.NombreDuplicado: t = "nombre repetido en la tabla"; break;
+                default: t = "nombre no valido"; break;
+            }
+            return string.IsNullOrEmpty(aviso) ? t : t + " (" + aviso + ")";
+        }
+
         /// <param name="cfg">Configuracion (catalogo, extras, reglas, simbolo de pulgada, tolerancia).</param>
         /// <param name="prefijo">Prefijo de nombre elegido en la ventana.</param>
         /// <param name="existentes">Tipos de barra del proyecto.</param>

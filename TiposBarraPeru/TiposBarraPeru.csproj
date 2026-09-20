@@ -28,6 +28,9 @@
     <None Update="config.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <None Update="materiales.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
   <!-- Copia automatica al directorio de add-ins de Revit al compilar en Debug (solo Windows) -->
@@ -36,7 +39,7 @@
       <AddinDir>$(AppData)\Autodesk\Revit\Addins\2027\TiposBarraPeru\</AddinDir>
     </PropertyGroup>
     <MakeDir Directories="$(AddinDir)" />
-    <Copy SourceFiles="$(TargetPath);$(TargetDir)TiposBarraPeru.Reglas.dll;$(ProjectDir)config.json" DestinationFolder="$(AddinDir)" />
+    <Copy SourceFiles="$(TargetPath);$(TargetDir)TiposBarraPeru.Reglas.dll;$(ProjectDir)config.json;$(ProjectDir)materiales.json" DestinationFolder="$(AddinDir)" />
     <Copy SourceFiles="$(ProjectDir)TiposBarraPeru.addin" DestinationFolder="$(AppData)\Autodesk\Revit\Addins\2027\" />
   </Target>
 

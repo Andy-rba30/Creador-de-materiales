@@ -26,6 +26,16 @@ namespace TiposBarraPeru.Reglas
             return (prefijo ?? "") + n;
         }
 
+        /// <summary>Prefijo por defecto de los materiales de concreto: "Concreto f'c " + f'c.</summary>
+        public const string PrefijoConcretoPorDefecto = "Concreto f'c ";
+
+        /// <summary>f'c como texto de catalogo, con punto decimal y sin ceros sobrantes: 210 -> "210", 212.5 -> "212.5".</summary>
+        public static string NombreCatalogoConcreto(double fcKgCm2) =>
+            fcKgCm2.ToString("0.##", System.Globalization.CultureInfo.InvariantCulture);
+
+        /// <summary>Nombre del material de concreto: prefijo + f'c ("Concreto f'c 210").</summary>
+        public static string GenerarConcreto(string prefijo, double fcKgCm2) => (prefijo ?? "") + NombreCatalogoConcreto(fcKgCm2);
+
         /// <summary>Comparacion de nombres de tipo: sin distinguir mayusculas ni espacios en los extremos.</summary>
         public static bool Iguales(string a, string b) =>
             string.Equals((a ?? "").Trim(), (b ?? "").Trim(), StringComparison.OrdinalIgnoreCase);

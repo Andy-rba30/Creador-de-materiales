@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <RevitAddIns>
-  <!-- Aplicacion: anade la pestana "Peru" con el boton "Tipos de barra Peru" -->
+  <!-- Aplicacion: anade la pestana "Peru" con los botones "Tipos de barra Peru" y "Materiales de concreto" -->
   <AddIn Type="Application">
     <Name>Tipos de barra Peru</Name>
     <Assembly>TiposBarraPeru\TiposBarraPeru.dll</Assembly>
@@ -17,6 +17,18 @@
     <Assembly>TiposBarraPeru\TiposBarraPeru.dll</Assembly>
     <FullClassName>TiposBarraPeru.ComandoTiposBarra</FullClassName>
     <ClientId>a9e17c3d-52b8-4f6a-8e04-3d6c9b2f7e15</ClientId>
+    <VendorId>LOCAL</VendorId>
+    <VendorDescription>Uso interno</VendorDescription>
+    <VisibilityMode>NotVisibleInFamily</VisibilityMode>
+  </AddIn>
+  <!-- Comando: materiales de concreto, tambien en Complementos > Herramientas externas -->
+  <AddIn Type="Command">
+    <Name>Materiales de concreto Peru</Name>
+    <Text>Materiales de concreto Peru</Text>
+    <Description>Crea en el proyecto los materiales de concreto del catalogo peruano (f'c en kg/cm2) con sus propiedades fisicas y termicas segun la norma E.060.</Description>
+    <Assembly>TiposBarraPeru\TiposBarraPeru.dll</Assembly>
+    <FullClassName>TiposBarraPeru.ComandoMaterialesConcreto</FullClassName>
+    <ClientId>5b7f3d2a-8c41-4e9b-a6d3-1f2e9c8b7a64</ClientId>
     <VendorId>LOCAL</VendorId>
     <VendorDescription>Uso interno</VendorDescription>
     <VisibilityMode>NotVisibleInFamily</VisibilityMode>
